@@ -4,11 +4,13 @@
 #include <time.h>
 #include <omp.h>
 
-const int no_points = 20;
+const int no_points = 50;
 const int max = 1000;
 int points[no_points][2];
 
-//To calculate square of a number
+//struct Compare { int val; int index; }; //for selection sort
+//#pragma omp declare reduction(minimum : struct Compare : omp_out = omp_in.val > omp_out.val ? omp_in : omp_out) //for selection sort
+
 int square(int num)
 {
     return num * num;
@@ -18,7 +20,6 @@ int square(int num)
 double fitness(int gene[no_points])
 {
     double distance;
-    #pragma omp parallel for reduction(+:distance)
     for (int i=0;i<(no_points-1);i++)
     {
         distance += sqrt((square(points[gene[i]][0]-points[gene[i+1]][1]))+(square(points[gene[i]][1]-points[gene[i+1]][1])));
@@ -56,21 +57,95 @@ void print(int gene[no_points])
     printf("\n");
 }
 
+void merge(int no_genes, double fit[no_genes], int genes[no_genes][no_points], int low, int mid, int high)
+{
+    int i,j,k;
+    int n1 = mid - low + 1; 
+    int n2 =  high - mid;
+    int L[n1], R[n2], G1[n1][no_points], G2[n2][no_points];
+    for (i = 0; i < n1; i++) 
+    {
+        L[i] = fit[low + i]; 
+        copy(G1[i],genes[low + i]);
+    }
+    for (i = 0; i < n2; i++) 
+    {
+        R[i] = fit[mid + 1+ i]; 
+        copy(G2[i],genes[mid+1+i]);
+    }
+    i=0;
+    j=0;
+    k=low;
+    while (i < n1 && j < n2) 
+    { 
+        if (L[i] <= R[j]) 
+        { 
+            fit[k] = L[i];
+            copy(genes[k],G1[i]);
+            i++; 
+        } 
+        else
+        { 
+            fit[k] = R[j]; 
+            copy(genes[k],G2[j]);
+            j++; 
+        } 
+        k++; 
+    } 
+
+    while (i < n1) 
+    {
+        fit[k] = L[i]; 
+        copy(genes[k],G1[i]);
+        i++; 
+        k++; 
+    }
+
+    while (j < n2) 
+    { 
+        fit[k] = R[j]; 
+        copy(genes[k],G2[j]);
+        j++; 
+        k++; 
+    } 
+}
+
+void mergeSort(int no_genes, double fit[no_genes], int genes[no_genes][no_points], int low, int high)
+{
+    if (low<high)
+    {
+        int mid = low+(high-low)/2;
+        #pragma omp parallel sections
+        {
+            #pragma omp section
+            {
+                mergeSort(no_genes, fit, genes, low, mid);
+            }
+            #pragma omp section
+            {
+                mergeSort(no_genes, fit, genes, mid + 1, high);
+            }
+        } 
+        merge(no_genes, fit, genes, low, mid, high);
+    }
+    else   
+        return;
+}
+
 int main()
 {
-    time_t t;
-    srand((unsigned) time(&t));
-    //Generating random points
+    double start_time = omp_get_wtime();
+
+    #pragma omp parallel for
     for (int i=0;i<no_points;i++)
     {
         points[i][0] = rand()%max;
         points[i][1] = rand()%max;
-        //printf("%d %d\n",points[i][0],points[i][1]);
     }
-
-    //Generating the initial genes
-    int no_genes = 20;
+    int no_genes = 10000;
     int genes[no_genes][no_points];
+
+    #pragma omp parallel for
     for (int i=0;i<no_genes;i++)
     {
         int occupied[no_points];
@@ -84,9 +159,6 @@ int main()
             genes[i][pos] = num;
             occupied[pos]=1;
         }
-        /*for (int j=0;j<no_points;j++)
-            printf("%d ",genes[i][j]);
-        printf("\n");*/
     }
     
     //Calculating fitness
@@ -96,25 +168,32 @@ int main()
     {
         fit[i] = fitness(genes[i]);
     }
-    //Sorting the genes according to fitness using selection sort
+
+    /*Selection sort
     for (int i=0;i<no_genes-1;i++)
     {
-        int position = i;
+        struct Compare min;
+        min.val = fit[i];
+        min.index = i;
+        //#pragma omp parallel for reduction(minimum:min)
         for (int j=i+1;j<no_genes;j++)
         {
-            if (fit[position] > fit[j])
-                position = j;
+            if (fit[j] < min.val)
+                min.val = fit[j];
+                min.index = j;
         }
-        if (position != i)
+        if (min.index != i)
         {
-            int temp = fit[position];
-            fit[position] = fit[i];
+            int temp = fit[min.index];
+            fit[min.index] = fit[i];
             fit[i] = temp;
-            swap(genes[position],genes[i]);
+            swap(genes[min.index],genes[i]);
         }
-    }
+    }*/
 
-    int no_iterations = 100;
+    mergeSort(no_genes, fit, genes, 0, no_genes-1);
+
+    int no_iterations = 500;
     for (int count=0;count<no_iterations;count++)
     {
         //Crossing over of genes to produce new genes
@@ -155,32 +234,15 @@ int main()
         {
             fit[i] = fitness(genes[i]);
         }
-        for (int i=0;i<no_genes-1;i++)
-        {
-            int position = i;
-            for (int j=i+1;j<no_genes;j++)
-            {
-                if (fit[position] > fit[j])
-                    position = j;
-            }
-            if (position != i)
-            {
-                int temp = fit[position];
-                fit[position] = fit[i];
-                fit[i] = temp;
-                swap(genes[position],genes[i]);
-            }
-        }
-        /*printf("\nGenes after sorting: \n");
-        for (int i=0;i<no_genes;i++)
-        {
-            print(genes[i]);
-            printf("%f\n",fit[i]);
-        }
-        printf("\n");*/
+        
+        mergeSort(no_genes, fit, genes, 0, no_genes-1);
     }
 
     printf("Gene with maximum fitness: \n");
     print(genes[0]);
     printf("Fitness: %f\n",fit[0]);
+
+    double total_time = omp_get_wtime() - start_time;
+    printf("The total time taken is: %f\n",total_time);
+
 }
