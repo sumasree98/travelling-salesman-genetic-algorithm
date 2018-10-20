@@ -136,15 +136,20 @@ int main()
 {
     double start_time = omp_get_wtime();
 
+    time_t t;
+    srand((unsigned) time(&t));
+
+    //Generating random points
     #pragma omp parallel for
     for (int i=0;i<no_points;i++)
     {
         points[i][0] = rand()%max;
         points[i][1] = rand()%max;
     }
-    int no_genes = 10000;
+    int no_genes = 5000;
     int genes[no_genes][no_points];
 
+    //Generating initial genes
     #pragma omp parallel for
     for (int i=0;i<no_genes;i++)
     {
@@ -193,7 +198,7 @@ int main()
 
     mergeSort(no_genes, fit, genes, 0, no_genes-1);
 
-    int no_iterations = 500;
+    int no_iterations = 100;
     for (int count=0;count<no_iterations;count++)
     {
         //Crossing over of genes to produce new genes
