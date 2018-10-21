@@ -134,7 +134,7 @@ int main()
         points[i][0] = rand()%max;
         points[i][1] = rand()%max;
     }
-    int no_genes = 5000;
+    int no_genes = 1000;
     int genes[no_genes][no_points];
 
     //Generating initial genes
@@ -143,7 +143,9 @@ int main()
         int occupied[no_points];
         for (int i=0;i<no_points;i++)
             occupied[i] = 0;
-        for (int num=1;num<=no_points;num++)
+        genes[i][0] = 1;
+        occupied[0] = 1;
+        for (int num=2;num<=no_points;num++)
         {
             int pos = rand()%no_points;
             while (occupied[pos]!=0)
@@ -181,7 +183,7 @@ int main()
 
     mergeSort(no_genes, fit, genes, 0, no_genes-1);
 
-    int no_iterations = 5000;
+    int no_iterations = 500;
     for (int count=0;count<no_iterations;count++)
     {
         //Crossing over of genes to produce new genes
