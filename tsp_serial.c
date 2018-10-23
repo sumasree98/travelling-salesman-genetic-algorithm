@@ -20,7 +20,7 @@ double fitness(int gene[no_points])
     double distance;
     for (int i=0;i<(no_points-1);i++)
     {
-        distance += sqrt((square(points[gene[i]][0]-points[gene[i+1]][1]))+(square(points[gene[i]][1]-points[gene[i+1]][1])));
+        distance += sqrt((square(points[gene[i]-1][0]-points[gene[i+1]-1][0]))+(square(points[gene[i]-1][1]-points[gene[i+1]-1][1])));
     }
     return distance;
 }
@@ -134,7 +134,7 @@ int main()
         points[i][0] = rand()%max;
         points[i][1] = rand()%max;
     }
-    int no_genes = 1000;
+    int no_genes = 500;
     int genes[no_genes][no_points];
 
     //Generating initial genes
